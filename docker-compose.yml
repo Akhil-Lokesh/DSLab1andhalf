@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: uber-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: ubereats
+    networks:
+      - ubereats-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.1
+    container_name: uber-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ubereats-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.1
+    container_name: uber-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - ubereats-network
+
+  backend:
+    build:
+      context: ./UberEATS-Backend
+    container_name: ubereats-backend
+    restart: always
+    ports:
+      - "5015:5015"
+    depends_on:
+      - mongo
+      - kafka
+    environment:
+      - PORT=5015
+      - MONGO_URI=mongodb://mongo:27017/ubereats
+      - SESSION_SECRET=uber_eats_secret_key
+      - CORS_ORIGIN=http://localhost:3000
+      - JWT_SECRET=jwt_secret_key_for_auth
+      - KAFKA_CLIENT_ID=ubereats-service
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_GROUP_ID=ubereats-group
+    volumes:
+      - ./UberEATS-Backend/uploads:/app/uploads
+    networks:
+      - ubereats-network
+
+  frontend:
+    build:
+      context: ./uber-eats-frontend
+    container_name: ubereats-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:5015/api
+    networks:
+      - ubereats-network
+
+networks:
+  ubereats-network:
+    driver: bridge
+
+volumes:
+  mongo_data:

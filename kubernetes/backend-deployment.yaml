@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: ubereats-backend:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5015
+        env:
+        - name: PORT
+          value: "5015"
+        - name: MONGO_URI
+          value: "mongodb://mongo:27017/ubereats"
+        - name: SESSION_SECRET
+          value: "uber_eats_secret_key"
+        - name: CORS_ORIGIN
+          value: "http://localhost:3000"
+        - name: JWT_SECRET
+          value: "jwt_secret_key_for_auth"
+        - name: KAFKA_CLIENT_ID
+          value: "ubereats-service"
+        - name: KAFKA_BROKERS
+          value: "kafka:9092"
+        - name: KAFKA_GROUP_ID
+          value: "ubereats-group"
+        volumeMounts:
+        - name: uploads-volume
+          mountPath: /app/uploads
+      volumes:
+      - name: uploads-volume
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: backend
+  ports:
+  - port: 5015
+    targetPort: 5015
+  type: LoadBalancer
